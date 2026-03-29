@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Camera - Live Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00d4ff;
+        }
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #1b4332;
+            color: #2ec4b6;
+        }
+        .status.disconnected {
+            background: #4a1c1c;
+            color: #ff6b6b;
+        }
+        .content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+        .video-container {
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .video-container img {
+            width: 100%;
+            display: block;
+        }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .detection-list {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .detection-list h2 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        .object-list {
+            list-style: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .object-list li {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            border-left: 4px solid #00d4ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .object-list li.person {
+            border-left-color: #ff6b6b;
+            background: #2d1f1f;
+        }
+        .object-list li .class-name {
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+        .object-list li .confidence {
+            color: #2ec4b6;
+            font-size: 0.9rem;
+        }
+        .empty-state {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+        .stats {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .stats h2 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #2a2a4a;
+        }
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        .controls {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+        .controls button:hover {
+            transform: scale(1.02);
+        }
+        .controls button:active {
+            transform: scale(0.98);
+        }
+        .btn-screenshot {
+            background: #00d4ff;
+            color: #1a1a2e;
+        }
+        .btn-notify {
+            background: #ff6b6b;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Camera - Live Detection</h1>
+        <div id="status" class="status disconnected">Connecting...</div>
+        
+        <div class="content">
+            <div class="video-container">
+                <img src="/video_feed" alt="Camera Feed">
+            </div>
+            
+            <div class="sidebar">
+                <div class="detection-list">
+                    <h2>Detected Objects</h2>
+                    <ul id="object-list" class="object-list">
+                        <li class="empty-state">No objects detected</li>
+                    </ul>
+                </div>
+                
+                <div class="stats">
+                    <h2>Statistics</h2>
+                    <div class="stat-item">
+                        <span>Total Detections</span>
+                        <span id="total-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Persons</span>
+                        <span id="person-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Highest Confidence</span>
+                        <span id="highest-confidence">-</span>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button class="btn-screenshot" onclick="takeScreenshot()">📷 Screenshot</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let totalDetections = 0;
+        let personCount = 0;
+        
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onopen = () => {
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').className = 'status connected';
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('status').textContent = 'Disconnected - Reconnecting...';
+                document.getElementById('status').className = 'status disconnected';
+                setTimeout(connect, 2000);
+            };
+            
+            ws.onerror = () => {
+                ws.close();
+            };
+            
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'detections') {
+                    updateDetections(msg.data);
+                }
+            };
+        }
+        
+        function updateDetections(detections) {
+            const list = document.getElementById('object-list');
+            
+            if (detections.length === 0) {
+                list.innerHTML = '<li class="empty-state">No objects detected</li>';
+                return;
+            }
+            
+            totalDetections = detections.length;
+            personCount = detections.filter(d => d.class.toLowerCase() === 'person').length;
+            
+            let highestConf = 0;
+            list.innerHTML = detections.map(d => {
+                const conf = (d.confidence * 100).toFixed(1);
+                if (d.confidence > highestConf) highestConf = d.confidence;
+                const isPerson = d.class.toLowerCase() === 'person';
+                return `<li class="${isPerson ? 'person' : ''}">
+                    <span class="class-name">${d.class}</span>
+                    <span class="confidence">${conf}%</span>
+                </li>`;
+            }).join('');
+            
+            document.getElementById('total-count').textContent = totalDetections;
+            document.getElementById('person-count').textContent = personCount;
+            document.getElementById('highest-confidence').textContent = 
+                highestConf > 0 ? `${(highestConf * 100).toFixed(1)}%` : '-';
+        }
+        
+        function takeScreenshot() {
+            fetch('/screenshot')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `screenshot-${Date.now()}.jpg`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+        }
+        
+        connect();
+    </script>
+</body>
+</html>

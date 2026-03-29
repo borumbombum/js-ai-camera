@@ -1,1 +1,12 @@
-{"name": "js-ai-camera", "version": "1.0.0", "description": "AI-powered camera object detection", "scripts": {"start": "serve -l 4421 -s ."}, "devDependencies": {"serve": "^14.2.0"}}
+{
+  "name": "js-ai-camera",
+  "version": "1.0.0",
+  "description": "AI-powered camera object detection",
+  "scripts": {
+    "start": "serve -l 4421 -s .",
+    "server": "cd server && python stream_server.py"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}
