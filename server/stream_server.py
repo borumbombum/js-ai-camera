@@ -261,6 +261,9 @@ async def handle_detection(frame, detections, detection_type="unknown"):
     objects_detail = "\n".join(
         [f"• {d.class_name} ({d.confidence:.1%})" for d in detections]
     )
+
+    await asyncio.sleep(1)
+
     screenshot_path = (
         str(timelapse_recorder.get_latest_image_path())
         if timelapse_recorder.get_latest_image_path()
