@@ -6,6 +6,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
 
+TIMELAPSE_RETENTION_HOURS = int(os.getenv("TIMELAPSE_RETENTION_HOURS", "24"))
+
 
 class TimelapseRecorder:
     def __init__(self, storage_dir: str = "recordings", interval: float = 2.0):
@@ -72,7 +74,7 @@ class TimelapseRecorder:
             self.cleanup()
 
     def cleanup(self):
-        cutoff = datetime.now() - timedelta(hours=24)
+        cutoff = datetime.now() - timedelta(hours=TIMELAPSE_RETENTION_HOURS)
         removed = 0
         for date_folder in self.storage_dir.iterdir():
             if not date_folder.is_dir():
@@ -85,7 +87,9 @@ class TimelapseRecorder:
             except ValueError:
                 continue
         if removed:
-            print(f"[Timelapse] Cleaned up {removed} old folders")
+            print(
+                f"[Timelapse] Cleaned up {removed} old folders (retention: {TIMELAPSE_RETENTION_HOURS}h)"
+            )
 
     def get_image_path(self, timestamp: datetime) -> Optional[Path]:
         date_str = timestamp.strftime("%Y-%m-%d")

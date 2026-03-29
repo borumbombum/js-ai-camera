@@ -230,18 +230,16 @@
                     list.innerHTML = events.map(event => {
                         const date = new Date(event.timestamp);
                         const timeStr = date.toLocaleString();
-                        const tgLink = event.telegram_url 
-                            ? `<a href="${event.telegram_url}" target="_blank" class="btn btn-xs btn-ghost">Telegram</a>`
-                            : '';
+                        const eventDate = date.toISOString().split('T')[0];
+                        const timelapseHref = event.timelapse_url || `/timelapse?date=${eventDate}`;
                         return `
-                            <div class="bg-base-300 rounded-lg p-3 space-y-1">
+                            <a href="${timelapseHref}" class="block bg-base-300 rounded-lg p-3 space-y-1 hover:bg-base-100 transition-colors cursor-pointer">
                                 <div class="flex justify-between items-start">
                                     <span class="text-xs text-base-content/60">${timeStr}</span>
-                                    <button onclick="deleteEvent(${event.id})" class="btn btn-xs btn-ghost text-error">✕</button>
+                                    <button onclick="event.stopPropagation(); deleteEvent(${event.id})" class="btn btn-xs btn-ghost text-error">✕</button>
                                 </div>
                                 <p class="text-sm font-medium">${event.objects}</p>
-                                <div class="flex gap-1">${tgLink}</div>
-                            </div>
+                            </a>
                         `;
                     }).join('');
                 }

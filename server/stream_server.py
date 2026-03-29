@@ -119,7 +119,10 @@ def init_db():
             screenshot_path TEXT
         )
     """)
-    conn.execute("ALTER TABLE events ADD COLUMN objects_detail TEXT")
+    cursor = conn.execute("PRAGMA table_info(events)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "objects_detail" not in columns:
+        conn.execute("ALTER TABLE events ADD COLUMN objects_detail TEXT")
     conn.commit()
     conn.close()
     log_event("Database initialized")
@@ -152,23 +155,32 @@ def save_event(
 def get_events_from_db(limit: int = 100) -> List[dict]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.execute(
-        "SELECT id, timestamp, objects, objects_detail, telegram_message_id, telegram_url, screenshot_path FROM events ORDER BY timestamp DESC LIMIT ?",
+        "SELECT id, timestamp, objects, telegram_message_id, telegram_url, screenshot_path, objects_detail FROM events ORDER BY timestamp DESC LIMIT ?",
         (limit,),
     )
     rows = cursor.fetchall()
     conn.close()
-    return [
-        {
-            "id": row[0],
-            "timestamp": row[1],
-            "objects": row[2],
-            "objects_detail": row[3],
-            "telegram_message_id": row[4],
-            "telegram_url": f"https://t.me/jsaicamerabot/{row[4]}" if row[4] else None,
-            "screenshot_path": row[5],
-        }
-        for row in rows
-    ]
+    events = []
+    for row in rows:
+        screenshot_path = row[5]
+        telegram_msg_id = row[3]
+        events.append(
+            {
+                "id": row[0],
+                "timestamp": row[1],
+                "objects": row[2],
+                "telegram_message_id": telegram_msg_id,
+                "telegram_url": f"https://t.me/jsaicamerabot/{telegram_msg_id}"
+                if telegram_msg_id
+                else None,
+                "screenshot_path": screenshot_path,
+                "objects_detail": row[6],
+                "timelapse_url": extract_timelapse_url(screenshot_path, SERVER_BASE_URL)
+                if screenshot_path
+                else None,
+            }
+        )
+    return events
 
 
 def delete_event(event_id: int) -> bool:
@@ -390,7 +402,18 @@ async def timelapse_page():
 
 @app.get("/timelapse/images")
 async def get_timelapse_images(date: str = Query(...), hour: int = Query(...)):
+    log_event(f"[TIMELAPSE] Loading images for {date} hour {hour}")
     images = timelapse_recorder.list_images(date, hour)
+    log_event(f"[TIMELAPSE] Returning {len(images)} images")
+    return {"images": images, "count": len(images)}
+
+
+@app.get("/timelapse/images/all")
+async def get_all_timelapse_images(date: str = Query(...)):
+    images = []
+    for hour in range(24):
+        hour_images = timelapse_recorder.list_images(date, hour)
+        images.extend(hour_images)
     return {"images": images, "count": len(images)}
 
 
@@ -400,13 +423,39 @@ async def get_timelapse_alerts(date: str = Query(...), hour: int = Query(...)):
     hour_str = f"{hour:02d}"
     pattern = f"%/{date}/{hour_str}/%"
     cursor = conn.execute(
-        "SELECT screenshot_path, objects_detail FROM events WHERE screenshot_path LIKE ?",
+        "SELECT screenshot_path, objects_detail, timestamp FROM events WHERE screenshot_path LIKE ?",
         (pattern,),
     )
     rows = cursor.fetchall()
     conn.close()
     alerts = [
-        {"path": f"/timelapse/image?path={row[0]}", "objects": row[1]}
+        {
+            "path": f"/timelapse/image?path={row[0]}",
+            "objects": row[1],
+            "timestamp": row[2],
+        }
+        for row in rows
+        if row[0]
+    ]
+    return {"alerts": alerts, "count": len(alerts)}
+
+
+@app.get("/timelapse/alerts/all")
+async def get_all_timelapse_alerts(date: str = Query(...)):
+    conn = sqlite3.connect(DB_PATH)
+    pattern = f"%/{date}/%"
+    cursor = conn.execute(
+        "SELECT screenshot_path, objects_detail, timestamp FROM events WHERE screenshot_path LIKE ?",
+        (pattern,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    alerts = [
+        {
+            "path": f"/timelapse/image?path={row[0]}",
+            "objects": row[1],
+            "timestamp": row[2],
+        }
         for row in rows
         if row[0]
     ]

@@ -23,46 +23,20 @@
             
             <div class="card bg-base-300 shadow-xl mb-6">
                 <div class="card-body">
-                    <div class="flex flex-col md:flex-row gap-4 mb-4">
+                    <div class="flex flex-col md:flex-row gap-4">
                         <div class="form-control">
                             <label class="label">
                                 <span class="label-text">Date</span>
                             </label>
-                            <input type="date" id="date-input" class="input input-bordered">
+                            <input type="date" id="date-input" class="input input-bordered" onchange="loadTimelapse()">
                         </div>
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text">Hour</span>
+                                <span class="label-text">Jump to Hour</span>
                             </label>
-                            <select id="hour-select" class="select select-bordered">
-                                <option value="00">00:00</option>
-                                <option value="01">01:00</option>
-                                <option value="02">02:00</option>
-                                <option value="03">03:00</option>
-                                <option value="04">04:00</option>
-                                <option value="05">05:00</option>
-                                <option value="06">06:00</option>
-                                <option value="07">07:00</option>
-                                <option value="08">08:00</option>
-                                <option value="09">09:00</option>
-                                <option value="10">10:00</option>
-                                <option value="11">11:00</option>
-                                <option value="12">12:00</option>
-                                <option value="13">13:00</option>
-                                <option value="14">14:00</option>
-                                <option value="15">15:00</option>
-                                <option value="16">16:00</option>
-                                <option value="17">17:00</option>
-                                <option value="18">18:00</option>
-                                <option value="19">19:00</option>
-                                <option value="20">20:00</option>
-                                <option value="21">21:00</option>
-                                <option value="22">22:00</option>
-                                <option value="23">23:00</option>
+                            <select id="hour-select" class="select select-bordered" onchange="jumpToHour(this.value)">
+                                <option value="">All Day</option>
                             </select>
-                        </div>
-                        <div class="form-control mt-auto">
-                            <button onclick="loadTimelapse()" class="btn btn-primary">Load</button>
                         </div>
                     </div>
                 </div>
@@ -211,22 +185,30 @@
         let alertImages = new Map();
         let currentIndex = 0;
         let selectedDate = '';
-        let selectedHour = '';
         let allThumbnailsVisible = false;
+        let hourIndices = {};
+        
+        function extractTimeFromPath(imgPath) {
+            const urlPath = imgPath.includes('path=') ? imgPath.split('path=')[1] : imgPath;
+            const parts = urlPath.split('/');
+            const filename = parts[parts.length - 1];
+            const timeParts = filename.replace('.jpg', '').split('_');
+            const hour = parts[parts.length - 2];
+            const minutes = timeParts[0];
+            const seconds = timeParts[1];
+            return `${hour}:${minutes}:${seconds}`;
+        }
         
         function init() {
             const params = new URLSearchParams(window.location.search);
             const urlDate = params.get('date');
-            const urlHour = params.get('hour');
             const urlMinute = params.get('minute');
             const urlSecond = params.get('second');
             
             const today = new Date().toISOString().split('T')[0];
             selectedDate = urlDate || today;
-            selectedHour = urlHour || new Date().getHours().toString().padStart(2, '0');
             
             document.getElementById('date-input').value = selectedDate;
-            document.getElementById('hour-select').value = selectedHour;
             
             loadTimelapse().then(() => {
                 if (urlMinute !== null && urlSecond !== null) {
@@ -236,14 +218,14 @@
                         selectImage(targetIdx);
                     }
                 } else {
-                    selectImage(0);
+                    selectImage(allImages.length - 1);
                 }
             });
         }
         
         async function loadTimelapse() {
             selectedDate = document.getElementById('date-input').value;
-            selectedHour = parseInt(document.getElementById('hour-select').value);
+            alertImages.clear();
             
             const mainImg = document.getElementById('main-image');
             const loading = document.getElementById('loading-indicator');
@@ -256,15 +238,11 @@
             loading.classList.remove('hidden');
             slider.disabled = true;
             thumbnails.innerHTML = '';
-            alertImages.clear();
-            allThumbnailsVisible = false;
-            document.getElementById('toggle-all-btn').textContent = 'Show All Images';
-            document.getElementById('all-thumbnails').classList.add('hidden');
-            
+
             try {
                 const [imagesRes, alertsRes] = await Promise.all([
-                    fetch(`/timelapse/images?date=${selectedDate}&hour=${selectedHour}`),
-                    fetch(`/timelapse/alerts?date=${selectedDate}&hour=${selectedHour}`)
+                    fetch(`/timelapse/images/all?date=${selectedDate}`),
+                    fetch(`/timelapse/alerts/all?date=${selectedDate}`)
                 ]);
                 const imagesData = await imagesRes.json();
                 const alertsData = await alertsRes.json();
@@ -275,6 +253,22 @@
                 
                 allImages = imagesData.images.reverse();
                 currentIndex = 0;
+                
+                hourIndices = {};
+                allImages.forEach((img, idx) => {
+                    const urlPath = img.includes('path=') ? img.split('path=')[1] : img;
+                    const parts = urlPath.split('/');
+                    const hour = parts[parts.length - 2];
+                    if (!hourIndices[hour]) hourIndices[hour] = idx;
+                });
+                
+                const hourSelect = document.getElementById('hour-select');
+                hourSelect.innerHTML = '<option value="">All Day</option>';
+                Object.keys(hourIndices).sort().forEach(hour => {
+                    hourSelect.innerHTML += `<option value="${hour}">${hour}:00 - ${hour}:59</option>`;
+                });
+                
+                console.log('Loaded:', allImages.length, 'images,', alertImages.size, 'alerts');
                 
                 document.getElementById('image-count').textContent = `${allImages.length} images (${alertImages.size} alerts)`;
                 
@@ -291,8 +285,7 @@
                 thumbnails.innerHTML = allImages
                     .filter(img => alertImages.has(img))
                     .map(img => {
-                        const parts = img.split('/').pop().replace('.jpg', '').split('_');
-                        const timeStr = `${parts[0]}:${parts[1]}`;
+                        const timeStr = extractTimeFromPath(img);
                         return `
                             <div class="relative group cursor-pointer" onclick="showAlertModal('${img}')">
                                 <img src="${img}" alt="" class="w-full h-12 object-cover rounded ring-2 ring-error hover:ring-4 transition-all">
@@ -317,8 +310,7 @@
             container.innerHTML = allImages.map((img, idx) => {
                 const isAlert = alertImages.has(img);
                 const ringClass = isAlert ? 'ring-2 ring-error' : '';
-                const parts = img.split('/').pop().replace('.jpg', '').split('_');
-                const timeStr = `${parts[0]}:${parts[1]}`;
+                const timeStr = extractTimeFromPath(img);
                 return `
                     <div class="relative group cursor-pointer" onclick="selectImage(${idx}); document.getElementById('alert_modal').close();">
                         <img src="${img}" alt="" class="w-full h-12 object-cover rounded ${ringClass} hover:ring-2 hover:ring-primary transition-all">
@@ -344,6 +336,14 @@
             }
         }
         
+        function jumpToHour(hour) {
+            if (hour === '' || !hourIndices[hour]) {
+                selectImage(allImages.length - 1);
+                return;
+            }
+            selectImage(hourIndices[hour]);
+        }
+        
         function selectImage(index) {
             currentIndex = index;
             const mainImg = document.getElementById('main-image');
@@ -352,27 +352,23 @@
             
             document.getElementById('timeline-slider').value = index;
             
-            const parts = allImages[index].split('/').pop().replace('.jpg', '').split('_');
-            document.getElementById('current-time').textContent = `${selectedHour.toString().padStart(2, '0')}:${parts[0]}:${parts[1]}`;
+            document.getElementById('current-time').textContent = extractTimeFromPath(allImages[index]);
         }
         
         function showAlertModal(imgPath) {
             document.getElementById('alert-modal-objects').textContent = alertImages.get(imgPath);
             document.getElementById('alert-modal-image').src = imgPath;
-            const parts = imgPath.split('/').pop().replace('.jpg', '').split('_');
-            document.getElementById('alert-modal-time').textContent = `${selectedDate} ${selectedHour.toString().padStart(2, '0')}:${parts[0]}:${parts[1]}`;
+            document.getElementById('alert-modal-time').textContent = `${selectedDate} ${extractTimeFromPath(imgPath)}`;
             document.getElementById('alert_modal').showModal();
         }
         
         function showMainImageModal() {
             const imgPath = allImages[currentIndex];
-            const isAlert = alertImages.has(imgPath);
-            const objects = isAlert ? alertImages.get(imgPath) : 'No detections';
+            const objects = alertImages.has(imgPath) ? alertImages.get(imgPath) : 'No detections';
             
             document.getElementById('alert-modal-objects').textContent = objects;
             document.getElementById('alert-modal-image').src = imgPath;
-            const parts = imgPath.split('/').pop().replace('.jpg', '').split('_');
-            document.getElementById('alert-modal-time').textContent = `${selectedDate} ${selectedHour.toString().padStart(2, '0')}:${parts[0]}:${parts[1]}`;
+            document.getElementById('alert-modal-time').textContent = `${selectedDate} ${extractTimeFromPath(imgPath)}`;
             document.getElementById('alert_modal').showModal();
         }
         
@@ -389,18 +385,16 @@
                     list.innerHTML = events.map(event => {
                         const date = new Date(event.timestamp);
                         const timeStr = date.toLocaleString();
-                        const tgLink = event.telegram_url 
-                            ? `<a href="${event.telegram_url}" target="_blank" class="btn btn-xs btn-ghost">Telegram</a>`
-                            : '';
+                        const eventDate = date.toISOString().split('T')[0];
+                        const timelapseHref = event.timelapse_url || `/timelapse?date=${eventDate}`;
                         return `
-                            <div class="bg-base-300 rounded-lg p-3 space-y-1">
+                            <a href="${timelapseHref}" class="block bg-base-300 rounded-lg p-3 space-y-1 hover:bg-base-100 transition-colors cursor-pointer">
                                 <div class="flex justify-between items-start">
                                     <span class="text-xs text-base-content/60">${timeStr}</span>
-                                    <button onclick="deleteEvent(${event.id})" class="btn btn-xs btn-ghost text-error">✕</button>
+                                    <button onclick="event.stopPropagation(); deleteEvent(${event.id})" class="btn btn-xs btn-ghost text-error">✕</button>
                                 </div>
                                 <p class="text-sm font-medium">${event.objects}</p>
-                                <div class="flex gap-1">${tgLink}</div>
-                            </div>
+                            </a>
                         `;
                     }).join('');
                 }
