@@ -219,7 +219,6 @@
         
         async function fetchEvents() {
             const list = document.getElementById('events-list');
-            const sidebarList = document.getElementById('sidebar-events-list');
             try {
                 const response = await fetch('/events');
                 const data = await response.json();
@@ -227,9 +226,8 @@
                 
                 if (events.length === 0) {
                     list.innerHTML = '<p class="text-base-content/50 text-sm">No events recorded</p>';
-                    sidebarList.innerHTML = '<p class="text-sm text-base-content/50">No events yet</p>';
                 } else {
-                    const formatEvent = (event) => {
+                    list.innerHTML = events.map(event => {
                         const date = new Date(event.timestamp);
                         const timeStr = date.toLocaleString();
                         const tgLink = event.telegram_url 
@@ -245,33 +243,12 @@
                                 <div class="flex gap-1">${tgLink}</div>
                             </div>
                         `;
-                    };
-                    
-                    const formatSidebarEvent = (event) => {
-                        const date = new Date(event.timestamp);
-                        const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        const tgLink = event.telegram_url 
-                            ? `<a href="${event.telegram_url}" target="_blank" class="text-xs link link-primary">TG</a>`
-                            : '';
-                        return `
-                            <div class="text-sm p-2 bg-base-300 rounded-lg">
-                                <div class="flex justify-between">
-                                    <span class="text-xs text-base-content/60">${timeStr}</span>
-                                    ${tgLink}
-                                </div>
-                                <span class="text-xs">${event.objects}</span>
-                            </div>
-                        `;
-                    };
-                    
-                    list.innerHTML = events.map(formatEvent).join('');
-                    sidebarList.innerHTML = events.slice(0, 10).map(formatSidebarEvent).join('');
+                    }).join('');
                 }
                 
                 document.getElementById('events-drawer-toggle').checked = true;
             } catch (err) {
                 list.innerHTML = `<p class="text-error text-sm">Failed to load events: ${err.message}</p>`;
-                sidebarList.innerHTML = `<p class="text-error text-sm">Error loading</p>`;
                 document.getElementById('events-drawer-toggle').checked = true;
             }
         }
@@ -327,14 +304,6 @@
                     </a>
                 </li>
             </ul>
-            
-            <div class="divider"></div>
-            <div id="sidebar-events" class="space-y-2 overflow-y-auto max-h-[50vh]">
-                <h3 class="font-semibold text-sm text-base-content/70 mb-2">Recent Events</h3>
-                <div id="sidebar-events-list">
-                    <p class="text-sm text-base-content/50">Loading...</p>
-                </div>
-            </div>
         </div>
     </div>
 </div>
