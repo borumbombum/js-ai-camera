@@ -57,7 +57,11 @@ class TelegramNotifier:
         self.chat_id = update.effective_chat.id
 
     async def send_detection_alert(
-        self, frame: np.ndarray, detections: list
+        self,
+        frame: np.ndarray,
+        detections: list,
+        detection_type: str = "unknown",
+        timelapse_url: str = "",
     ) -> Tuple[bool, Optional[int], str]:
         """
         Send detection alert to Telegram.
@@ -82,7 +86,13 @@ class TelegramNotifier:
             detection_text = "\n".join(
                 [f"• {d.class_name} ({d.confidence:.1%})" for d in detections]
             )
-            message = f"🚨 Detection Alert!\n\n{unique_classes}\n\n{detection_text}"
+
+            emoji = "🚨" if detection_type == "person" else "🐾"
+            type_label = "Person" if detection_type == "person" else "Animal"
+            message = f"{emoji} {type_label} Detected!\n\n{unique_classes}\n\n{detection_text}"
+
+            if timelapse_url:
+                message += f"\n\n📍 Timelapse: {timelapse_url}"
 
         try:
             result = await self.application.bot.send_photo(

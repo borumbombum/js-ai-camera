@@ -16,11 +16,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 
 from detector import ObjectDetector, Detection
 from telegram_bot import TelegramNotifier
+from timelapse import TimelapseRecorder
 
 DB_PATH = Path(__file__).parent / "events.db"
 
@@ -28,6 +29,7 @@ DETECTION_COOLDOWN = int(os.getenv("DETECTION_COOLDOWN", "30"))
 PERSON_CONFIDENCE_THRESHOLD = float(os.getenv("PERSON_CONFIDENCE_THRESHOLD", "0.51"))
 ANIMAL_CONFIDENCE_THRESHOLD = float(os.getenv("ANIMAL_CONFIDENCE_THRESHOLD", "0.51"))
 ANIMAL_COOLDOWN = int(os.getenv("ANIMAL_COOLDOWN", "30"))
+SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://localhost:4422")
 
 
 class Camera:
@@ -38,6 +40,9 @@ class Camera:
         self.current_detections: List[Detection] = []
         self.last_person_detection = 0
         self.last_animal_detection = 0
+
+    def get_frame_for_timelapse(self) -> Optional[np.ndarray]:
+        return self.current_frame
 
     def open(self):
         log_event(f"Opening camera {self.camera_index}...")
@@ -91,6 +96,7 @@ manager = ConnectionManager()
 camera = Camera()
 detector = ObjectDetector()
 log_buffer = deque(maxlen=100)
+timelapse_recorder = TimelapseRecorder()
 
 
 def log_event(message: str, level: str = "INFO"):
@@ -107,11 +113,13 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             objects TEXT NOT NULL,
+            objects_detail TEXT,
             telegram_message_id INTEGER,
             telegram_url TEXT,
             screenshot_path TEXT
         )
     """)
+    conn.execute("ALTER TABLE events ADD COLUMN objects_detail TEXT")
     conn.commit()
     conn.close()
     log_event("Database initialized")
@@ -121,13 +129,15 @@ def save_event(
     objects: str,
     telegram_message_id: Optional[int] = None,
     screenshot_path: Optional[str] = None,
+    objects_detail: Optional[str] = None,
 ) -> int:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.execute(
-        "INSERT INTO events (timestamp, objects, telegram_message_id, telegram_url, screenshot_path) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO events (timestamp, objects, objects_detail, telegram_message_id, telegram_url, screenshot_path) VALUES (?, ?, ?, ?, ?, ?)",
         (
             datetime.now().isoformat(),
             objects,
+            objects_detail,
             telegram_message_id,
             None,
             screenshot_path,
@@ -142,7 +152,7 @@ def save_event(
 def get_events_from_db(limit: int = 100) -> List[dict]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.execute(
-        "SELECT id, timestamp, objects, telegram_message_id, telegram_url, screenshot_path FROM events ORDER BY timestamp DESC LIMIT ?",
+        "SELECT id, timestamp, objects, objects_detail, telegram_message_id, telegram_url, screenshot_path FROM events ORDER BY timestamp DESC LIMIT ?",
         (limit,),
     )
     rows = cursor.fetchall()
@@ -152,9 +162,10 @@ def get_events_from_db(limit: int = 100) -> List[dict]:
             "id": row[0],
             "timestamp": row[1],
             "objects": row[2],
-            "telegram_message_id": row[3],
-            "telegram_url": f"https://t.me/jsaicamerabot/{row[3]}" if row[3] else None,
-            "screenshot_path": row[4],
+            "objects_detail": row[3],
+            "telegram_message_id": row[4],
+            "telegram_url": f"https://t.me/jsaicamerabot/{row[4]}" if row[4] else None,
+            "screenshot_path": row[5],
         }
         for row in rows
     ]
@@ -200,7 +211,7 @@ async def detection_loop():
             and (time.time() - camera.last_person_detection) > DETECTION_COOLDOWN
         ):
             camera.last_person_detection = time.time()
-            asyncio.create_task(handle_detection(frame, persons))
+            asyncio.create_task(handle_detection(frame_with_boxes, persons, "person"))
             log_event(f"Person detected! Sending Telegram notification", "WARNING")
 
         animals = detector.get_animal_detections(
@@ -208,7 +219,7 @@ async def detection_loop():
         )
         if animals and (time.time() - camera.last_animal_detection) > ANIMAL_COOLDOWN:
             camera.last_animal_detection = time.time()
-            asyncio.create_task(handle_detection(frame, animals))
+            asyncio.create_task(handle_detection(frame_with_boxes, animals, "animal"))
             animal_types = ", ".join(sorted(set(a.class_name for a in animals)))
             log_event(
                 f"Animal detected ({animal_types})! Sending Telegram notification",
@@ -218,20 +229,57 @@ async def detection_loop():
         await asyncio.sleep(0.1)
 
 
-async def handle_detection(frame, persons):
-    success, message_id, status = await telegram.send_detection_alert(frame, persons)
-    objects_str = ", ".join(sorted(set(p.class_name for p in persons)))
-    event_id = save_event(objects_str, message_id)
-    log_event(f"Event saved: id={event_id}, telegram_msg_id={message_id}")
+def extract_timelapse_url(
+    screenshot_path: str, base_url: str = "http://localhost:4422"
+) -> str:
+    if not screenshot_path:
+        return ""
+    parts = Path(screenshot_path).parts
+    if len(parts) >= 4:
+        date = parts[-3]
+        hour = parts[-2]
+        time_part = parts[-1].replace(".jpg", "")
+        minute, second = time_part.split("_")
+        return f"{base_url}/timelapse?date={date}&hour={hour}&minute={minute}&second={second}"
+    return ""
+
+
+async def handle_detection(frame, detections, detection_type="unknown"):
+    objects_str = ", ".join(sorted(set(d.class_name for d in detections)))
+    objects_detail = "\n".join(
+        [f"• {d.class_name} ({d.confidence:.1%})" for d in detections]
+    )
+    screenshot_path = (
+        str(timelapse_recorder.get_latest_image_path())
+        if timelapse_recorder.get_latest_image_path()
+        else None
+    )
+    timelapse_url = (
+        extract_timelapse_url(screenshot_path, SERVER_BASE_URL)
+        if screenshot_path
+        else ""
+    )
+
+    success, message_id, status = await telegram.send_detection_alert(
+        frame, detections, detection_type, timelapse_url
+    )
+
+    event_id = save_event(objects_str, message_id, screenshot_path, objects_detail)
+    log_event(
+        f"Event saved: id={event_id}, telegram_msg_id={message_id}, screenshot={screenshot_path}"
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     camera.open()
+    timelapse_recorder.set_frame_getter(camera.get_frame_for_timelapse)
+    await timelapse_recorder.start()
     asyncio.create_task(detection_loop())
     asyncio.create_task(telegram.start())
     yield
+    await timelapse_recorder.stop()
     camera.release()
     await telegram.stop()
 
@@ -331,6 +379,46 @@ async def delete_event_endpoint(event_id: int):
     if delete_event(event_id):
         return {"success": True, "message": f"Event {event_id} deleted"}
     raise HTTPException(status_code=404, detail="Event not found")
+
+
+@app.get("/timelapse")
+async def timelapse_page():
+    template_path = Path(__file__).parent / "templates" / "timelapse.html"
+    with open(template_path, "r") as f:
+        return HTMLResponse(f.read())
+
+
+@app.get("/timelapse/images")
+async def get_timelapse_images(date: str = Query(...), hour: int = Query(...)):
+    images = timelapse_recorder.list_images(date, hour)
+    return {"images": images, "count": len(images)}
+
+
+@app.get("/timelapse/alerts")
+async def get_timelapse_alerts(date: str = Query(...), hour: int = Query(...)):
+    conn = sqlite3.connect(DB_PATH)
+    hour_str = f"{hour:02d}"
+    pattern = f"%/{date}/{hour_str}/%"
+    cursor = conn.execute(
+        "SELECT screenshot_path, objects_detail FROM events WHERE screenshot_path LIKE ?",
+        (pattern,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    alerts = [
+        {"path": f"/timelapse/image?path={row[0]}", "objects": row[1]}
+        for row in rows
+        if row[0]
+    ]
+    return {"alerts": alerts, "count": len(alerts)}
+
+
+@app.get("/timelapse/image")
+async def get_timelapse_image(path: str = Query(...)):
+    image_path = Path(path)
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(image_path)
 
 
 if __name__ == "__main__":
