@@ -17,6 +17,8 @@ COLORS = {
     "default": (0, 255, 255),
 }
 
+ANIMALS = ["dog", "cat", "bird", "horse", "sheep", "cow", "chicken", "pig", "rabbit"]
+
 
 @dataclass
 class Detection:
@@ -87,4 +89,13 @@ class ObjectDetector:
             d
             for d in detections
             if d.class_name.lower() == "person" and d.confidence >= min_confidence
+        ]
+
+    def get_animal_detections(
+        self, detections: List[Detection], min_confidence: float = 0.51
+    ) -> List[Detection]:
+        return [
+            d
+            for d in detections
+            if d.class_name.lower() in ANIMALS and d.confidence >= min_confidence
         ]

@@ -26,6 +26,8 @@ DB_PATH = Path(__file__).parent / "events.db"
 
 DETECTION_COOLDOWN = int(os.getenv("DETECTION_COOLDOWN", "30"))
 PERSON_CONFIDENCE_THRESHOLD = float(os.getenv("PERSON_CONFIDENCE_THRESHOLD", "0.51"))
+ANIMAL_CONFIDENCE_THRESHOLD = float(os.getenv("ANIMAL_CONFIDENCE_THRESHOLD", "0.51"))
+ANIMAL_COOLDOWN = int(os.getenv("ANIMAL_COOLDOWN", "30"))
 
 
 class Camera:
@@ -35,6 +37,7 @@ class Camera:
         self.current_frame: Optional[np.ndarray] = None
         self.current_detections: List[Detection] = []
         self.last_person_detection = 0
+        self.last_animal_detection = 0
 
     def open(self):
         log_event(f"Opening camera {self.camera_index}...")
@@ -199,6 +202,18 @@ async def detection_loop():
             camera.last_person_detection = time.time()
             asyncio.create_task(handle_detection(frame, persons))
             log_event(f"Person detected! Sending Telegram notification", "WARNING")
+
+        animals = detector.get_animal_detections(
+            detections, ANIMAL_CONFIDENCE_THRESHOLD
+        )
+        if animals and (time.time() - camera.last_animal_detection) > ANIMAL_COOLDOWN:
+            camera.last_animal_detection = time.time()
+            asyncio.create_task(handle_detection(frame, animals))
+            animal_types = ", ".join(sorted(set(a.class_name for a in animals)))
+            log_event(
+                f"Animal detected ({animal_types})! Sending Telegram notification",
+                "WARNING",
+            )
 
         await asyncio.sleep(0.1)
 
