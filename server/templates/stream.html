@@ -1,224 +1,135 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Camera - Live Detection</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00d4ff;
-        }
-        .status {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            border-radius: 8px;
-            font-weight: bold;
-        }
-        .status.connected {
-            background: #1b4332;
-            color: #2ec4b6;
-        }
-        .status.disconnected {
-            background: #4a1c1c;
-            color: #ff6b6b;
-        }
-        .content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-        }
-        @media (max-width: 768px) {
-            .content {
-                grid-template-columns: 1fr;
-            }
-        }
-        .video-container {
-            background: #16213e;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        .video-container img {
-            width: 100%;
-            display: block;
-        }
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .detection-list {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        .detection-list h2 {
-            color: #00d4ff;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-        .object-list {
-            list-style: none;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .object-list li {
-            padding: 12px;
-            margin-bottom: 8px;
-            background: #1a1a2e;
-            border-radius: 8px;
-            border-left: 4px solid #00d4ff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .object-list li.person {
-            border-left-color: #ff6b6b;
-            background: #2d1f1f;
-        }
-        .object-list li .class-name {
-            font-weight: bold;
-            text-transform: capitalize;
-        }
-        .object-list li .confidence {
-            color: #2ec4b6;
-            font-size: 0.9rem;
-        }
-        .empty-state {
-            text-align: center;
-            color: #666;
-            padding: 20px;
-        }
-        .stats {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        .stats h2 {
-            color: #00d4ff;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-        .stat-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #2a2a4a;
-        }
-        .stat-item:last-child {
-            border-bottom: none;
-        }
-        .controls {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        .controls button {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.1s;
-        }
-        .controls button:hover {
-            transform: scale(1.02);
-        }
-        .controls button:active {
-            transform: scale(0.98);
-        }
-        .btn-screenshot {
-            background: #00d4ff;
-            color: #1a1a2e;
-        }
-        .btn-notify {
-            background: #ff6b6b;
-            color: white;
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
 </head>
-<body>
-    <div class="container">
-        <h1>AI Camera - Live Detection</h1>
-        <div id="status" class="status disconnected">Connecting...</div>
+<body class="min-h-screen p-4 md:p-8 pb-24">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-3xl font-bold text-primary">AI Camera</h1>
+            <div class="flex gap-2">
+                <button onclick="fetchLogs()" class="btn btn-ghost btn-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Logs
+                </button>
+                <a href="https://t.me/jsaicamerabot" target="_blank" class="btn btn-ghost btn-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Telegram
+                </a>
+            </div>
+        </div>
         
-        <div class="content">
-            <div class="video-container">
-                <img src="/video_feed" alt="Camera Feed">
+        <div class="flex items-center gap-2 mb-4">
+            <div id="status-dot" class="w-3 h-3 rounded-full bg-error animate-pulse"></div>
+            <span id="status-text" class="text-sm text-base-content/70">Connecting...</span>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2">
+                <div class="card bg-base-300 shadow-xl">
+                    <figure class="bg-base-200">
+                        <img src="/video_feed" alt="Camera Feed" class="w-full">
+                    </figure>
+                </div>
             </div>
             
-            <div class="sidebar">
-                <div class="detection-list">
-                    <h2>Detected Objects</h2>
-                    <ul id="object-list" class="object-list">
-                        <li class="empty-state">No objects detected</li>
-                    </ul>
-                </div>
-                
-                <div class="stats">
-                    <h2>Statistics</h2>
-                    <div class="stat-item">
-                        <span>Total Detections</span>
-                        <span id="total-count">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Persons</span>
-                        <span id="person-count">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Highest Confidence</span>
-                        <span id="highest-confidence">-</span>
+            <div class="space-y-4">
+                <div class="card bg-base-300 shadow-xl">
+                    <div class="card-body">
+                        <h2 class="card-title text-primary">Detected Objects</h2>
+                        <ul id="object-list" class="menu bg-base-100 rounded-lg p-2 max-h-64 overflow-y-auto">
+                            <li class="menu-title text-base-content/60">No objects detected</li>
+                        </ul>
                     </div>
                 </div>
                 
-                <div class="controls">
-                    <button class="btn-screenshot" onclick="takeScreenshot()">📷 Screenshot</button>
+                <div class="card bg-base-300 shadow-xl">
+                    <div class="card-body">
+                        <h2 class="card-title text-primary">Statistics</h2>
+                        <div class="stats stats-vertical lg:stats-horizontal shadow w-full">
+                            <div class="stat p-4">
+                                <div class="stat-title">Total</div>
+                                <div id="total-count" class="stat-value text-primary">0</div>
+                            </div>
+                            <div class="stat p-4">
+                                <div class="stat-title">Persons</div>
+                                <div id="person-count" class="stat-value text-secondary">0</div>
+                            </div>
+                            <div class="stat p-4">
+                                <div class="stat-title">Confidence</div>
+                                <div id="highest-confidence" class="stat-value text-accent">-</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+    
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-3">
+        <button onclick="takeScreenshot()" class="btn btn-lg btn-primary shadow-lg backdrop-blur-md bg-primary/20 border border-primary/50 hover:bg-primary/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Screenshot
+        </button>
+    </div>
+
+    <dialog id="logs_modal" class="modal">
+        <div class="modal-box max-w-2xl max-h-[80vh]">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-lg mb-4">Server Logs</h3>
+            <div class="bg-base-100 rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
+                <div id="logs-container" class="space-y-1">
+                    <p class="text-base-content/50">Loading logs...</p>
+                </div>
+            </div>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button class="btn">Close</button>
+                </form>
+                <button onclick="fetchLogs()" class="btn btn-ghost">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
 
     <script>
         let ws;
-        let totalDetections = 0;
-        let personCount = 0;
         
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
             
             ws.onopen = () => {
-                document.getElementById('status').textContent = 'Connected';
-                document.getElementById('status').className = 'status connected';
+                const dot = document.getElementById('status-dot');
+                const text = document.getElementById('status-text');
+                dot.className = 'w-3 h-3 rounded-full bg-success';
+                dot.classList.remove('animate-pulse');
+                text.textContent = 'Connected';
             };
             
             ws.onclose = () => {
-                document.getElementById('status').textContent = 'Disconnected - Reconnecting...';
-                document.getElementById('status').className = 'status disconnected';
+                const dot = document.getElementById('status-dot');
+                const text = document.getElementById('status-text');
+                dot.className = 'w-3 h-3 rounded-full bg-error animate-pulse';
+                text.textContent = 'Reconnecting...';
                 setTimeout(connect, 2000);
             };
             
@@ -238,28 +149,21 @@
             const list = document.getElementById('object-list');
             
             if (detections.length === 0) {
-                list.innerHTML = '<li class="empty-state">No objects detected</li>';
+                list.innerHTML = '<li class="menu-title text-base-content/60">No objects detected</li>';
                 return;
             }
             
-            totalDetections = detections.length;
-            personCount = detections.filter(d => d.class.toLowerCase() === 'person').length;
-            
-            let highestConf = 0;
             list.innerHTML = detections.map(d => {
                 const conf = (d.confidence * 100).toFixed(1);
-                if (d.confidence > highestConf) highestConf = d.confidence;
                 const isPerson = d.class.toLowerCase() === 'person';
-                return `<li class="${isPerson ? 'person' : ''}">
-                    <span class="class-name">${d.class}</span>
-                    <span class="confidence">${conf}%</span>
-                </li>`;
+                const colorClass = isPerson ? 'text-secondary' : 'text-primary';
+                return `<li><a class="${colorClass}"><span class="font-bold capitalize">${d.class}</span><span class="badge badge-ghost">${conf}%</span></a></li>`;
             }).join('');
             
-            document.getElementById('total-count').textContent = totalDetections;
-            document.getElementById('person-count').textContent = personCount;
-            document.getElementById('highest-confidence').textContent = 
-                highestConf > 0 ? `${(highestConf * 100).toFixed(1)}%` : '-';
+            document.getElementById('total-count').textContent = detections.length;
+            document.getElementById('person-count').textContent = detections.filter(d => d.class.toLowerCase() === 'person').length;
+            const highest = Math.max(...detections.map(d => d.confidence));
+            document.getElementById('highest-confidence').textContent = highest > 0 ? `${(highest * 100).toFixed(1)}%` : '-';
         }
         
         function takeScreenshot() {
@@ -273,6 +177,30 @@
                     a.click();
                     URL.revokeObjectURL(url);
                 });
+        }
+        
+        async function fetchLogs() {
+            const container = document.getElementById('logs-container');
+            try {
+                const response = await fetch('/logs');
+                const data = await response.json();
+                
+                if (data.logs.length === 0) {
+                    container.innerHTML = '<p class="text-base-content/50">No logs yet</p>';
+                } else {
+                    container.innerHTML = data.logs.map(log => {
+                        let levelColor = 'text-info';
+                        if (log.level === 'WARNING') levelColor = 'text-warning';
+                        if (log.level === 'ERROR') levelColor = 'text-error';
+                        return `<div><span class="text-base-content/50">${log.timestamp}</span> <span class="${levelColor}">[${log.level}]</span> ${log.message}</div>`;
+                    }).reverse().join('');
+                }
+                
+                document.getElementById('logs_modal').showModal();
+            } catch (err) {
+                container.innerHTML = `<p class="text-error">Failed to load logs: ${err.message}</p>`;
+                document.getElementById('logs_modal').showModal();
+            }
         }
         
         connect();
