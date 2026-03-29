@@ -202,6 +202,7 @@
         function init() {
             const params = new URLSearchParams(window.location.search);
             const urlDate = params.get('date');
+            const urlHour = params.get('hour');
             const urlMinute = params.get('minute');
             const urlSecond = params.get('second');
             
@@ -213,9 +214,16 @@
             loadTimelapse().then(() => {
                 if (urlMinute !== null && urlSecond !== null) {
                     const targetTime = `${urlMinute}_${urlSecond.padStart(2, '0')}`;
-                    const targetIdx = allImages.findIndex(img => img.includes(targetTime));
+                    const targetIdx = allImages.findIndex(img => {
+                        if (!img.includes(targetTime)) return false;
+                        if (urlHour) return img.includes(`/${urlHour}/`);
+                        return true;
+                    });
                     if (targetIdx >= 0) {
                         selectImage(targetIdx);
+                        if (urlHour) {
+                            document.getElementById('hour-select').value = urlHour;
+                        }
                     }
                 } else {
                     selectImage(allImages.length - 1);
