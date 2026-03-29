@@ -361,6 +361,8 @@
             document.getElementById('timeline-slider').value = index;
             
             document.getElementById('current-time').textContent = extractTimeFromPath(allImages[index]);
+            
+            document.getElementById('main-image-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
         function showAlertModal(imgPath) {
