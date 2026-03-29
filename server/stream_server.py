@@ -25,6 +25,7 @@ from telegram_bot import TelegramNotifier
 DB_PATH = Path(__file__).parent / "events.db"
 
 DETECTION_COOLDOWN = int(os.getenv("DETECTION_COOLDOWN", "30"))
+PERSON_CONFIDENCE_THRESHOLD = float(os.getenv("PERSON_CONFIDENCE_THRESHOLD", "0.51"))
 
 
 class Camera:
@@ -114,7 +115,9 @@ def init_db():
 
 
 def save_event(
-    objects: str, telegram_message_id: int = None, screenshot_path: str = None
+    objects: str,
+    telegram_message_id: Optional[int] = None,
+    screenshot_path: Optional[str] = None,
 ) -> int:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.execute(
@@ -186,7 +189,9 @@ async def detection_loop():
             json.dumps({"type": "detections", "data": detection_data})
         )
 
-        persons = detector.get_person_detections(detections)
+        persons = detector.get_person_detections(
+            detections, PERSON_CONFIDENCE_THRESHOLD
+        )
         if (
             persons
             and (time.time() - camera.last_person_detection) > DETECTION_COOLDOWN
