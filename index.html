@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>COCO-SSD Object Detection with List</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 12px;
+            }
+            #container {
+                position: relative;
+                width: 640px;
+            }
+            video,
+            canvas {
+                width: 100%;
+                display: block;
+                border-radius: 6px;
+            }
+            canvas {
+                position: absolute;
+                top: 0;
+                left: 0;
+                pointer-events: none;
+            }
+            #object-list {
+                margin-top: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>COCO-SSD Detection</h2>
+        <div id="container">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div>
+            <h3>Detected Objects</h3>
+            <ul id="object-list"></ul>
+        </div>
+
+        <script>
+            const video = document.getElementById("video");
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+            const objectListEl = document.getElementById("object-list");
+
+            async function setupCamera() {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                return new Promise((resolve) => (video.onloadedmetadata = () => resolve(video)));
+            }
+
+            async function run() {
+                await setupCamera();
+                const model = await cocoSsd.load({ base: "lite_mobilenet_v2" });
+
+                // Resize canvas to video size
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                async function detectFrame() {
+                    const predictions = await model.detect(video);
+
+                    // Draw video + boxes
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    predictions.forEach((pred) => {
+                        ctx.strokeStyle = "#00FF00";
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(...pred.bbox);
+
+                        ctx.fillStyle = "#00FF00";
+                        ctx.font = "16px Arial";
+                        ctx.fillText(
+                            `${pred.class} ${(pred.score * 100).toFixed(1)}%`,
+                            pred.bbox[0],
+                            pred.bbox[1] > 10 ? pred.bbox[1] - 5 : 10,
+                        );
+                    });
+
+                    // Update dynamic object list
+                    objectListEl.innerHTML = ""; // clear previous
+                    // Sort predictions by score descending
+                    const sorted = predictions.sort((a, b) => b.score - a.score);
+                    sorted.forEach((pred) => {
+                        const li = document.createElement("li");
+                        li.textContent = `${pred.class} - ${(pred.score * 100).toFixed(1)}%`;
+                        objectListEl.appendChild(li);
+                    });
+
+                    requestAnimationFrame(detectFrame);
+                }
+
+                detectFrame();
+            }
+
+            run();
+        </script>
+    </body>
+</html>
