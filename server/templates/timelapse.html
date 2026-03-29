@@ -220,13 +220,13 @@
                         return true;
                     });
                     if (targetIdx >= 0) {
-                        selectImage(targetIdx);
+                        selectImageAndScroll(targetIdx);
                         if (urlHour) {
                             document.getElementById('hour-select').value = urlHour;
                         }
                     }
                 } else {
-                    selectImage(allImages.length - 1);
+                    selectImageAndScroll(allImages.length - 1);
                 }
             });
         }
@@ -320,7 +320,7 @@
                 const ringClass = isAlert ? 'ring-2 ring-error' : '';
                 const timeStr = extractTimeFromPath(img);
                 return `
-                    <div class="relative group cursor-pointer" onclick="selectImage(${idx}); document.getElementById('alert_modal').close();">
+                    <div class="relative group cursor-pointer" onclick="selectImageAndScroll(${idx}); document.getElementById('alert_modal').close();">
                         <img src="${img}" alt="" class="w-full h-12 object-cover rounded ${ringClass} hover:ring-2 hover:ring-primary transition-all">
                         <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 rounded-b text-center">
                             ${timeStr}
@@ -346,10 +346,10 @@
         
         function jumpToHour(hour) {
             if (hour === '' || !hourIndices[hour]) {
-                selectImage(allImages.length - 1);
+                selectImageAndScroll(allImages.length - 1);
                 return;
             }
-            selectImage(hourIndices[hour]);
+            selectImageAndScroll(hourIndices[hour]);
         }
         
         function selectImage(index) {
@@ -361,7 +361,10 @@
             document.getElementById('timeline-slider').value = index;
             
             document.getElementById('current-time').textContent = extractTimeFromPath(allImages[index]);
-            
+        }
+        
+        function selectImageAndScroll(index) {
+            selectImage(index);
             document.getElementById('main-image-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
