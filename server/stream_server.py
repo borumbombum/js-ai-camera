@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import cv2
 import asyncio
 import json
@@ -15,11 +16,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from detector import ObjectDetector, Detection
 from telegram_bot import TelegramNotifier
+
+DB_PATH = Path(__file__).parent / "events.db"
 
 DETECTION_COOLDOWN = int(os.getenv("DETECTION_COOLDOWN", "30"))
 
@@ -93,6 +96,73 @@ def log_event(message: str, level: str = "INFO"):
     print(f"[{timestamp}] [{level}] {message}")
 
 
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            objects TEXT NOT NULL,
+            telegram_message_id INTEGER,
+            telegram_url TEXT,
+            screenshot_path TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+    log_event("Database initialized")
+
+
+def save_event(
+    objects: str, telegram_message_id: int = None, screenshot_path: str = None
+) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.execute(
+        "INSERT INTO events (timestamp, objects, telegram_message_id, telegram_url, screenshot_path) VALUES (?, ?, ?, ?, ?)",
+        (
+            datetime.now().isoformat(),
+            objects,
+            telegram_message_id,
+            None,
+            screenshot_path,
+        ),
+    )
+    event_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return event_id
+
+
+def get_events_from_db(limit: int = 100) -> List[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.execute(
+        "SELECT id, timestamp, objects, telegram_message_id, telegram_url, screenshot_path FROM events ORDER BY timestamp DESC LIMIT ?",
+        (limit,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "timestamp": row[1],
+            "objects": row[2],
+            "telegram_message_id": row[3],
+            "telegram_url": f"https://t.me/jsaicamerabot/{row[3]}" if row[3] else None,
+            "screenshot_path": row[4],
+        }
+        for row in rows
+    ]
+
+
+def delete_event(event_id: int) -> bool:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+
 telegram = TelegramNotifier(log_callback=lambda msg, level=None: log_event(msg, level))
 
 
@@ -122,14 +192,22 @@ async def detection_loop():
             and (time.time() - camera.last_person_detection) > DETECTION_COOLDOWN
         ):
             camera.last_person_detection = time.time()
-            asyncio.create_task(telegram.send_detection_alert(frame, persons))
+            asyncio.create_task(handle_detection(frame, persons))
             log_event(f"Person detected! Sending Telegram notification", "WARNING")
 
         await asyncio.sleep(0.1)
 
 
+async def handle_detection(frame, persons):
+    success, message_id, status = await telegram.send_detection_alert(frame, persons)
+    objects_str = ", ".join(sorted(set(p.class_name for p in persons)))
+    event_id = save_event(objects_str, message_id)
+    log_event(f"Event saved: id={event_id}, telegram_msg_id={message_id}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     camera.open()
     asyncio.create_task(detection_loop())
     asyncio.create_task(telegram.start())
@@ -221,6 +299,18 @@ async def get_detections():
 @app.get("/logs")
 async def get_logs():
     return {"logs": list(log_buffer)}
+
+
+@app.get("/events")
+async def get_events_endpoint(limit: int = 100):
+    return {"events": get_events_from_db(limit)}
+
+
+@app.delete("/events/{event_id}")
+async def delete_event_endpoint(event_id: int):
+    if delete_event(event_id):
+        return {"success": True, "message": f"Event {event_id} deleted"}
+    raise HTTPException(status_code=404, detail="Event not found")
 
 
 if __name__ == "__main__":

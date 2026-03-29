@@ -1,6 +1,7 @@
 import os
 import asyncio
 from io import BytesIO
+from typing import Optional, Tuple
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -55,14 +56,20 @@ class TelegramNotifier:
         await update.message.reply_text(f"Your chat ID: {update.effective_chat.id}")
         self.chat_id = update.effective_chat.id
 
-    async def send_detection_alert(self, frame: np.ndarray, detections: list):
+    async def send_detection_alert(
+        self, frame: np.ndarray, detections: list
+    ) -> Tuple[bool, Optional[int], str]:
+        """
+        Send detection alert to Telegram.
+        Returns: (success, message_id or None, status_message)
+        """
         if not self.chat_id:
             self.log("Cannot send notification: no chat ID configured", "ERROR")
-            return
+            return False, None, "No chat ID configured"
 
         if not self.application:
             self.log("Cannot send notification: bot not initialized", "ERROR")
-            return
+            return False, None, "Bot not initialized"
 
         _, buffer = cv2.imencode(".jpg", frame)
         photo = BytesIO(buffer)
@@ -78,15 +85,18 @@ class TelegramNotifier:
             message = f"🚨 Detection Alert!\n\n{unique_classes}\n\n{detection_text}"
 
         try:
-            await self.application.bot.send_photo(
+            result = await self.application.bot.send_photo(
                 chat_id=self.chat_id, photo=photo, caption=message
             )
+            message_id = result.message_id
             self.log(
-                f"Telegram notification sent: {len(detections)} object(s) detected",
+                f"Telegram notification sent (msg_id={message_id}): {len(detections)} object(s)",
                 "INFO",
             )
+            return True, message_id, "sent"
         except Exception as e:
             self.log(f"Failed to send Telegram notification: {e}", "ERROR")
+            return False, None, f"Failed: {str(e)}"
 
     def set_chat_id(self, chat_id: int):
         self.chat_id = chat_id
