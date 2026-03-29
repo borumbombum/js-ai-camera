@@ -17,7 +17,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </label>
-                <h1 class="text-2xl md:text-3xl font-bold text-primary">AI Camera</h1>
+                <h1 class="text-2xl md:text-3xl font-bold text-primary">Live Camera</h1>
                 <div class="w-10"></div>
             </div>
         
@@ -231,14 +231,17 @@
                         const date = new Date(event.timestamp);
                         const timeStr = date.toLocaleString();
                         const eventDate = date.toISOString().split('T')[0];
-                        const timelapseHref = event.timelapse_url || `/timelapse?date=${eventDate}`;
+                        const hasScreenshot = event.screenshot_path && event.timelapse_url;
+                        const timelapseHref = hasScreenshot ? event.timelapse_url : `/timelapse?date=${eventDate}`;
+                        const imageIndicator = hasScreenshot ? '' : '<span class="text-xs text-error">(image deleted)</span>';
                         return `
-                            <a href="${timelapseHref}" class="block bg-base-300 rounded-lg p-3 space-y-1 hover:bg-base-100 transition-colors cursor-pointer">
+                            <a href="${timelapseHref}" class="block bg-base-300 rounded-lg p-3 space-y-1 hover:bg-base-100 transition-colors cursor-pointer ${!hasScreenshot ? 'opacity-60' : ''}">
                                 <div class="flex justify-between items-start">
                                     <span class="text-xs text-base-content/60">${timeStr}</span>
                                     <button onclick="event.stopPropagation(); deleteEvent(${event.id})" class="btn btn-xs btn-ghost text-error">✕</button>
                                 </div>
                                 <p class="text-sm font-medium">${event.objects}</p>
+                                ${imageIndicator}
                             </a>
                         `;
                     }).join('');

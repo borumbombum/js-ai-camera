@@ -295,7 +295,7 @@
                     .map(img => {
                         const timeStr = extractTimeFromPath(img);
                         return `
-                            <div class="relative group cursor-pointer" onclick="showAlertModal('${img}')">
+                            <div class="relative group cursor-pointer" onclick="selectImageAndScroll(allImages.indexOf('${img}')); showAlertModal('${img}')">
                                 <img src="${img}" alt="" class="w-full h-12 object-cover rounded ring-2 ring-error hover:ring-4 transition-all">
                                 <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 rounded-b text-center">
                                     ${timeStr}

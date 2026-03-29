@@ -1,6 +1,6 @@
 # AI Camera - Real-time Object Detection
 
-Real-time webcam object detection with optional Telegram notifications when people are detected.
+Real-time webcam object detection with Telegram notifications and timelapse recording.
 
 ## Quick Start
 
@@ -25,7 +25,8 @@ npm run server
 
 # 3. Open in browser
 # - Live detection: http://localhost:4422/stream
-# - MJPEG stream:   http://localhost:4422/video_feed
+# - Timelapse viewer: http://localhost:4422/timelapse
+# - MJPEG stream: http://localhost:4422/video_feed
 
 # 4. Setup Telegram bot
 # Send /start to @jsaicamerabot
@@ -34,9 +35,16 @@ npm run server
 ## Features
 
 - Real-time object detection using YOLOv8 (server) or COCO-SSD (client)
-- Live video stream with bounding boxes
-- Real-time object list with confidence scores
-- Telegram notifications when a person is detected
+- Live video stream with bounding boxes and confidence scores
+- Telegram notifications when a person or animal is detected
+- Timelapse recording with configurable retention (default: 24 hours)
+- Timelapse viewer with day-wide navigation and hour jump
+- Event history with manual deletion option
+- Alert thumbnails highlight detection events in timelapse
+
+### Supported Animals
+
+Detection for: dog, cat, bird, horse, sheep, cow, chicken, pig, rabbit
 
 ## Architecture
 
@@ -46,5 +54,13 @@ See [AGENTS.md](AGENTS.md) for full documentation.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | (embedded) | Telegram bot token |
-| `DETECTION_COOLDOWN` | 30 | Seconds between notifications |
+| `TELEGRAM_BOT_TOKEN` | (required) | Telegram bot token from @BotFather |
+| `TELEGRAM_CHAT_ID` | (required) | Your Telegram chat ID |
+| `DETECTION_COOLDOWN` | 30 | Seconds between person notifications |
+| `PERSON_CONFIDENCE_THRESHOLD` | 0.51 | Min confidence for person detection |
+| `ANIMAL_CONFIDENCE_THRESHOLD` | 0.51 | Min confidence for animal detection |
+| `ANIMAL_COOLDOWN` | 30 | Seconds between animal notifications |
+| `SERVER_BASE_URL` | http://localhost:4422 | Public URL for Telegram links |
+| `TIMELAPSE_RETENTION_HOURS` | 24 | Hours to keep timelapse images |
+
+Copy `.env.example` to `.env` and configure as needed.
