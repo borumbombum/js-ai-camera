@@ -1,14 +1,10 @@
 {
   "name": "js-ai-camera",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "AI-powered camera object detection",
   "scripts": {
-    "start": "serve -l 4421 -s .",
     "server": "cd server && ../.venv/bin/python stream_server.py",
     "stop": "lsof -ti :4422 | xargs kill 2>/dev/null || true",
     "restart": "npm run stop && sleep 1 && npm run server &"
-  },
-  "devDependencies": {
-    "serve": "^14.2.0"
   }
 }

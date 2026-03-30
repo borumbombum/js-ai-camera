@@ -25,6 +25,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div id="status-dot" class="w-3 h-3 rounded-full bg-error animate-pulse"></div>
             <span id="status-text" class="text-sm text-base-content/70">Connecting...</span>
+            <div id="model-badge" class="badge badge-neutral ml-auto">Loading...</div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -128,6 +129,17 @@
     <script>
         let ws;
         
+        async function fetchModelInfo() {
+            try {
+                const resp = await fetch('/api/model');
+                const data = await resp.json();
+                document.getElementById('model-badge').textContent = `${data.model} • ${data.speed_ms}ms`;
+            } catch (e) {
+                console.error('Failed to fetch model info:', e);
+            }
+            setTimeout(fetchModelInfo, 5000);
+        }
+        
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
@@ -138,6 +150,7 @@
                 dot.className = 'w-3 h-3 rounded-full bg-success';
                 dot.classList.remove('animate-pulse');
                 text.textContent = 'Connected';
+                fetchModelInfo();
             };
             
             ws.onclose = () => {

@@ -31,6 +31,7 @@ class Detection:
 class ObjectDetector:
     def __init__(self, model_name: str = None):
         model_name = model_name or os.getenv("YOLO_MODEL", "yolov8n.pt")
+        self.model_name = model_name
         self.model = YOLO(model_name)
         self.class_names = self.model.names
 

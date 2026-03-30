@@ -194,15 +194,26 @@ def delete_event(event_id: int) -> bool:
 
 telegram = TelegramNotifier(log_callback=lambda msg, level=None: log_event(msg, level))
 
+detection_speed_ms = 0
+detection_speed_history = []
+
 
 async def detection_loop():
+    global detection_speed_ms, detection_speed_history
     while True:
         frame = camera.read()
         if frame is None:
             await asyncio.sleep(0.1)
             continue
 
+        start_time = time.time()
         detections = detector.detect(frame)
+        elapsed_ms = (time.time() - start_time) * 1000
+        detection_speed_history.append(elapsed_ms)
+        if len(detection_speed_history) > 50:
+            detection_speed_history.pop(0)
+        detection_speed_ms = sum(detection_speed_history) / len(detection_speed_history)
+
         frame_with_boxes = detector.draw_detections(frame, detections)
         camera.current_frame = frame_with_boxes
         camera.current_detections = detections
@@ -387,6 +398,11 @@ async def get_detections():
             for d in camera.current_detections
         ]
     }
+
+
+@app.get("/api/model")
+async def get_model():
+    return {"model": detector.model_name, "speed_ms": round(detection_speed_ms, 1)}
 
 
 @app.get("/logs")
