@@ -22,10 +22,11 @@
                 <div class="w-10"></div>
             </div>
         
-        <div class="flex items-center gap-2 mb-4">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
             <div id="status-dot" class="w-3 h-3 rounded-full bg-error animate-pulse"></div>
             <span id="status-text" class="text-sm text-base-content/70">Connecting...</span>
-            <div id="model-badge" class="badge badge-neutral ml-auto">Loading...</div>
+            <div id="camera-badge" class="badge badge-info">Loading...</div>
+            <div id="model-badge" class="badge badge-neutral">Loading...</div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,6 +137,13 @@
                 document.getElementById('model-badge').textContent = `${data.model} • ${data.speed_ms}ms`;
             } catch (e) {
                 console.error('Failed to fetch model info:', e);
+            }
+            try {
+                const resp = await fetch('/api/camera');
+                const data = await resp.json();
+                document.getElementById('camera-badge').textContent = `${data.type} • ${data.resolution} • ${data.fps}fps`;
+            } catch (e) {
+                console.error('Failed to fetch camera info:', e);
             }
             setTimeout(fetchModelInfo, 5000);
         }

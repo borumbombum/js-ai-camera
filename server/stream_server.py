@@ -35,23 +35,53 @@ SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://localhost:4422")
 class Camera:
     def __init__(self, camera_index: int = 0):
         self.camera_index = camera_index
+        self.camera_url = os.getenv("CAMERA_URL", "")
         self.cap: Optional[cv2.VideoCapture] = None
         self.current_frame: Optional[np.ndarray] = None
         self.current_detections: List[Detection] = []
         self.last_person_detection = 0
         self.last_animal_detection = 0
+        self._is_rtsp = bool(self.camera_url)
+
+    @property
+    def source(self) -> str:
+        if self._is_rtsp:
+            return self.camera_url
+        return f"Webcam {self.camera_index}"
 
     def get_frame_for_timelapse(self) -> Optional[np.ndarray]:
         return self.current_frame
 
+    def get_info(self) -> dict:
+        if self.cap and self.cap.isOpened():
+            width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+            height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            fps = self.cap.get(cv2.CAP_PROP_FPS)
+            return {
+                "source": self.source,
+                "type": "RTSP" if self._is_rtsp else "Webcam",
+                "resolution": f"{int(width)}x{int(height)}",
+                "fps": round(fps, 1) if fps > 0 else "N/A",
+            }
+        return {
+            "source": self.source,
+            "type": "Unknown",
+            "resolution": "N/A",
+            "fps": "N/A",
+        }
+
     def open(self):
-        log_event(f"Opening camera {self.camera_index}...")
-        self.cap = cv2.VideoCapture(self.camera_index)
+        log_event(f"Opening camera: {self.source}")
+        if self._is_rtsp:
+            self.cap = cv2.VideoCapture(self.camera_url)
+        else:
+            self.cap = cv2.VideoCapture(self.camera_index)
+            if self.cap.isOpened():
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         if not self.cap.isOpened():
-            log_event(f"Failed to open camera {self.camera_index}", "ERROR")
+            log_event(f"Failed to open camera: {self.source}", "ERROR")
             return False
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         log_event("Camera opened successfully")
         return True
 
@@ -403,6 +433,11 @@ async def get_detections():
 @app.get("/api/model")
 async def get_model():
     return {"model": detector.model_name, "speed_ms": round(detection_speed_ms, 1)}
+
+
+@app.get("/api/camera")
+async def get_camera():
+    return camera.get_info()
 
 
 @app.get("/logs")
