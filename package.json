@@ -1,6 +1,6 @@
 {
   "name": "js-ai-camera",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered camera object detection",
   "scripts": {
     "start": "serve -l 4421 -s .",

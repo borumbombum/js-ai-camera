@@ -48,6 +48,15 @@
                     <div class="flex flex-col gap-4">
                         <div class="order-1 lg:order-0">
                             <div class="mt-4 lg:mt-0">
+                                <div class="flex gap-2 mb-2">
+                                    <button id="play-btn" onclick="togglePlay()" class="btn btn-sm btn-primary" disabled>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                        <span>Play</span>
+                                    </button>
+                                    <button id="speed-1x-btn" onclick="setSpeed(500)" class="btn btn-sm btn-secondary btn-active" disabled>1x</button>
+                                    <button id="speed-5x-btn" onclick="setSpeed(100)" class="btn btn-sm btn-secondary" disabled>5x</button>
+                                    <button id="speed-10x-btn" onclick="setSpeed(50)" class="btn btn-sm btn-accent" disabled>10x</button>
+                                </div>
                                 <div class="flex justify-between text-sm text-base-content/60 mb-2">
                                     <span id="current-time">--:--:--</span>
                                     <span id="image-count">0 images</span>
@@ -199,6 +208,11 @@
         let visibleThumbnailCount = 100;
         const THUMBNAIL_BATCH_SIZE = 100;
         
+        let isPlaying = false;
+        let playInterval = null;
+        let playSpeed = 500;
+        const DEFAULT_SPEED = 500;
+        
         function extractTimeFromPath(imgPath) {
             const urlPath = imgPath.includes('path=') ? imgPath.split('path=')[1] : imgPath;
             const parts = urlPath.split('/');
@@ -253,6 +267,8 @@
         }
         
         async function loadTimelapse() {
+            if (isPlaying) togglePlay();
+            
             selectedDate = document.getElementById('date-input').value;
             alertImages.clear();
             visibleThumbnailCount = 100;
@@ -267,6 +283,10 @@
             noImages.classList.add('hidden');
             loading.classList.remove('hidden');
             slider.disabled = true;
+            document.getElementById('play-btn').disabled = true;
+            document.getElementById('speed-1x-btn').disabled = true;
+            document.getElementById('speed-5x-btn').disabled = true;
+            document.getElementById('speed-10x-btn').disabled = true;
             thumbnails.innerHTML = '';
 
             try {
@@ -311,6 +331,10 @@
                 
                 slider.max = allImages.length - 1;
                 slider.disabled = false;
+                document.getElementById('play-btn').disabled = false;
+                document.getElementById('speed-1x-btn').disabled = false;
+                document.getElementById('speed-5x-btn').disabled = false;
+                document.getElementById('speed-10x-btn').disabled = false;
                 
                 thumbnails.innerHTML = allImages
                     .filter(img => alertImages.has(img))
@@ -520,6 +544,55 @@
             document.getElementById('alert-modal-image').src = imgPath;
             document.getElementById('alert-modal-time').textContent = `${selectedDate} ${extractTimeFromPath(imgPath)}`;
             document.getElementById('alert_modal').showModal();
+        }
+        
+        function togglePlay() {
+            const playBtn = document.getElementById('play-btn');
+            
+            if (isPlaying) {
+                clearInterval(playInterval);
+                playInterval = null;
+                isPlaying = false;
+                playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>Play</span>`;
+            } else {
+                isPlaying = true;
+                setSpeed(playSpeed);
+                playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg><span>Pause</span>`;
+            }
+        }
+        
+        function setSpeed(speed) {
+            playSpeed = speed;
+            
+            const btn1x = document.getElementById('speed-1x-btn');
+            const btn5x = document.getElementById('speed-5x-btn');
+            const btn10x = document.getElementById('speed-10x-btn');
+            
+            btn1x.classList.remove('btn-secondary', 'btn-active');
+            btn5x.classList.remove('btn-secondary', 'btn-active');
+            btn10x.classList.remove('btn-accent', 'btn-active');
+            
+            if (speed === 500) {
+                btn1x.classList.add('btn-active');
+                btn1x.classList.add('btn-secondary');
+            } else if (speed === 100) {
+                btn5x.classList.add('btn-active');
+                btn5x.classList.add('btn-secondary');
+            } else if (speed === 50) {
+                btn10x.classList.add('btn-active');
+                btn10x.classList.add('btn-accent');
+            }
+            
+            if (isPlaying) {
+                clearInterval(playInterval);
+                playInterval = setInterval(() => {
+                    if (currentIndex < allImages.length - 1) {
+                        selectImage(currentIndex + 1);
+                    } else {
+                        togglePlay();
+                    }
+                }, playSpeed);
+            }
         }
         
         document.getElementById('timeline-slider').addEventListener('input', (e) => {
