@@ -187,6 +187,8 @@
         let selectedDate = '';
         let allThumbnailsVisible = false;
         let hourIndices = {};
+        let visibleThumbnailCount = 100;
+        const THUMBNAIL_BATCH_SIZE = 100;
         
         function extractTimeFromPath(imgPath) {
             const urlPath = imgPath.includes('path=') ? imgPath.split('path=')[1] : imgPath;
@@ -206,7 +208,7 @@
             const urlMinute = params.get('minute');
             const urlSecond = params.get('second');
             
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             selectedDate = urlDate || today;
             
             document.getElementById('date-input').value = selectedDate;
@@ -221,11 +223,21 @@
                     });
                     if (targetIdx >= 0) {
                         selectImageAndScroll(targetIdx);
+                        visibleThumbnailCount = Math.min(targetIdx + 10, Math.max(100, allImages.length));
+                        if (visibleThumbnailCount > 100) {
+                            allThumbnailsVisible = true;
+                            document.getElementById('all-thumbnails').classList.remove('hidden');
+                            document.getElementById('toggle-all-btn').textContent = 'Hide All Images';
+                            renderAllThumbnails();
+                        } else {
+                            visibleThumbnailCount = 100;
+                            renderAllThumbnails();
+                        }
                         if (urlHour) {
                             document.getElementById('hour-select').value = urlHour;
                         }
                     }
-                } else {
+                } else if (allImages.length > 0) {
                     selectImage(0);
                 }
             });
@@ -234,6 +246,7 @@
         async function loadTimelapse() {
             selectedDate = document.getElementById('date-input').value;
             alertImages.clear();
+            visibleThumbnailCount = 100;
             
             const mainImg = document.getElementById('main-image');
             const loading = document.getElementById('loading-indicator');
@@ -315,19 +328,117 @@
         
         function renderAllThumbnails() {
             const container = document.getElementById('all-thumbnails');
-            container.innerHTML = allImages.map((img, idx) => {
-                const isAlert = alertImages.has(img);
-                const ringClass = isAlert ? 'ring-2 ring-error' : '';
-                const timeStr = extractTimeFromPath(img);
-                return `
-                    <div class="relative group cursor-pointer" onclick="selectImageAndScroll(${idx}); document.getElementById('alert_modal').close();">
-                        <img src="${img}" alt="" class="w-full h-12 object-cover rounded ${ringClass} hover:ring-2 hover:ring-primary transition-all">
-                        <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 rounded-b text-center">
-                            ${timeStr}
+            const visibleImages = allImages.slice(0, visibleThumbnailCount);
+            
+            if (allThumbnailsVisible) {
+                container.innerHTML = visibleImages.map((img, idx) => {
+                    const isAlert = alertImages.has(img);
+                    const ringClass = isAlert ? 'ring-2 ring-error' : '';
+                    const timeStr = extractTimeFromPath(img);
+                    return `
+                        <div class="relative group cursor-pointer thumbnail-item" data-idx="${idx}" style="min-height: 3rem;">
+                            <img data-src="${img}" alt="" class="w-full h-12 object-cover rounded ${ringClass} hover:ring-2 hover:ring-primary transition-all lazy-img">
+                            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 rounded-b text-center">
+                                ${timeStr}
+                            </div>
                         </div>
-                    </div>
+                    `;
+                }).join('');
+                
+                container.innerHTML += `
+                    <button id="load-more-btn" onclick="loadMoreThumbnails()" class="btn btn-sm btn-ghost w-full mt-2 col-span-12">
+                        Load More (${allImages.length - visibleThumbnailCount} remaining)
+                    </button>
                 `;
-            }).join('');
+                
+                setupLazyLoading();
+            } else {
+                container.innerHTML = visibleImages.map((img, idx) => {
+                    const isAlert = alertImages.has(img);
+                    const ringClass = isAlert ? 'ring-2 ring-error' : '';
+                    const timeStr = extractTimeFromPath(img);
+                    return `
+                        <div class="relative group cursor-pointer" onclick="selectImageAndScroll(${idx}); document.getElementById('alert_modal').close();">
+                            <img src="${img}" alt="" class="w-full h-12 object-cover rounded ${ringClass} hover:ring-2 hover:ring-primary transition-all">
+                            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 rounded-b text-center">
+                                ${timeStr}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                const remaining = allImages.length - visibleThumbnailCount;
+                if (remaining > 0) {
+                    container.innerHTML += `
+                        <button onclick="loadMoreThumbnails()" class="btn btn-sm btn-ghost w-full mt-2">
+                            Load More (${remaining} remaining)
+                        </button>
+                    `;
+                }
+            }
+        }
+        
+        let lazyObserver = null;
+        
+        function setupLazyLoading() {
+            if (lazyObserver) {
+                lazyObserver.disconnect();
+            }
+            
+            lazyObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            img.classList.remove('lazy-img');
+                        }
+                    }
+                });
+            }, { rootMargin: '200px' });
+            
+            document.querySelectorAll('.lazy-img').forEach(img => {
+                lazyObserver.observe(img);
+            });
+        }
+        
+        function loadMoreThumbnails() {
+            visibleThumbnailCount = Math.min(visibleThumbnailCount + THUMBNAIL_BATCH_SIZE, allImages.length);
+            
+            if (allThumbnailsVisible) {
+                const container = document.getElementById('all-thumbnails');
+                const loadMoreBtn = document.getElementById('load-more-btn');
+                const startIdx = visibleThumbnailCount - THUMBNAIL_BATCH_SIZE;
+                const endIdx = visibleThumbnailCount;
+                
+                const newItems = allImages.slice(startIdx, endIdx).map((img, i) => {
+                    const idx = startIdx + i;
+                    const isAlert = alertImages.has(img);
+                    const ringClass = isAlert ? 'ring-2 ring-error' : '';
+                    const timeStr = extractTimeFromPath(img);
+                    return `
+                        <div class="relative group cursor-pointer thumbnail-item" data-idx="${idx}" style="min-height: 3rem;">
+                            <img data-src="${img}" alt="" class="w-full h-12 object-cover rounded ${ringClass} hover:ring-2 hover:ring-primary transition-all lazy-img">
+                            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 rounded-b text-center">
+                                ${timeStr}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                loadMoreBtn.insertAdjacentHTML('beforebegin', newItems);
+                setupLazyLoading();
+                
+                const remaining = allImages.length - visibleThumbnailCount;
+                if (remaining > 0) {
+                    loadMoreBtn.textContent = `Load More (${remaining} remaining)`;
+                } else {
+                    loadMoreBtn.remove();
+                }
+            } else {
+                renderAllThumbnails();
+            }
         }
         
         function toggleAllThumbnails() {
@@ -336,11 +447,19 @@
             allThumbnailsVisible = !allThumbnailsVisible;
             
             if (allThumbnailsVisible) {
+                visibleThumbnailCount = THUMBNAIL_BATCH_SIZE;
                 container.classList.remove('hidden');
                 btn.textContent = 'Hide All Images';
+                renderAllThumbnails();
             } else {
+                if (lazyObserver) {
+                    lazyObserver.disconnect();
+                    lazyObserver = null;
+                }
                 container.classList.add('hidden');
                 btn.textContent = 'Show All Images';
+                visibleThumbnailCount = THUMBNAIL_BATCH_SIZE;
+                container.innerHTML = '';
             }
         }
         
@@ -455,6 +574,15 @@
         
         document.getElementById('timeline-slider').addEventListener('input', (e) => {
             selectImage(parseInt(e.target.value));
+        });
+        
+        document.getElementById('all-thumbnails').addEventListener('click', (e) => {
+            const item = e.target.closest('.thumbnail-item');
+            if (item) {
+                const idx = parseInt(item.dataset.idx);
+                selectImageAndScroll(idx);
+                document.getElementById('alert_modal').close();
+            }
         });
         
         init();

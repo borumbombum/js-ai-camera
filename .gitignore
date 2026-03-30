@@ -7,3 +7,4 @@ recordings/
 server/events.db
 .DS_Store
 **/.DS_Store
+server.log
