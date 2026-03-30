@@ -23,21 +23,29 @@
             </div>
             
             <div class="card bg-base-300 shadow-xl mb-6">
-                <div class="card-body">
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Date</span>
-                            </label>
-                            <input type="date" id="date-input" class="input input-bordered" onchange="loadTimelapse()">
-                        </div>
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Jump to Hour</span>
-                            </label>
-                            <select id="hour-select" class="select select-bordered" onchange="jumpToHour(this.value)">
-                                <option value="">All Day</option>
-                            </select>
+                <div class="card-body p-4">
+                    <button id="filters-toggle" onclick="toggleFilters()" class="btn btn-ghost btn-sm w-full flex justify-between items-center mb-2">
+                        <span class="font-medium">Filters</span>
+                        <svg id="filters-chevron" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div id="filters-content" class="hidden">
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Date</span>
+                                </label>
+                                <input type="date" id="date-input" class="input input-bordered" onchange="loadTimelapse()">
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Jump to Hour</span>
+                                </label>
+                                <select id="hour-select" class="select select-bordered" onchange="jumpToHour(this.value)">
+                                    <option value="">All Day</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -230,6 +238,11 @@
             const urlHour = params.get('hour');
             const urlMinute = params.get('minute');
             const urlSecond = params.get('second');
+            
+            if (urlDate || urlHour || urlMinute || urlSecond) {
+                document.getElementById('filters-content').classList.remove('hidden');
+                document.getElementById('filters-chevron').classList.add('rotate-180');
+            }
             
             const today = new Date().toLocaleDateString('en-CA');
             selectedDate = urlDate || today;
@@ -503,6 +516,13 @@
                 visibleThumbnailCount = THUMBNAIL_BATCH_SIZE;
                 container.innerHTML = '';
             }
+        }
+        
+        function toggleFilters() {
+            const content = document.getElementById('filters-content');
+            const chevron = document.getElementById('filters-chevron');
+            content.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-180');
         }
         
         function jumpToHour(hour) {
