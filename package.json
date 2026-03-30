@@ -1,6 +1,6 @@
 {
   "name": "js-ai-camera",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "AI-powered camera object detection",
   "scripts": {
     "server": "cd server && ../.venv/bin/python stream_server.py",

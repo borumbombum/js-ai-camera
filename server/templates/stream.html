@@ -132,6 +132,18 @@
         </div>
     </dialog>
 
+    <dialog id="mobile-fullscreen-modal" class="modal">
+        <div class="fixed inset-0 bg-black flex items-center justify-center">
+            <img id="mobile-fullscreen-image" src="/video_feed" alt="Camera Feed" class="max-w-full max-h-full object-contain">
+            <button onclick="closeMobileFullscreen()" class="absolute top-4 right-4 btn btn-circle btn-sm bg-black/50 border-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button class="fixed inset-0 w-full h-full bg-transparent cursor-default"></button></form>
+    </dialog>
+
     <script>
         let ws;
         
@@ -207,13 +219,25 @@
             document.getElementById('highest-confidence').textContent = highest > 0 ? `${(highest * 100).toFixed(1)}%` : '-';
         }
         
+        function isMobile() {
+            return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+        }
+
         function toggleFullscreen() {
-            const img = document.getElementById('camera-image');
-            if (!document.fullscreenElement) {
-                img.requestFullscreen();
+            if (isMobile()) {
+                document.getElementById('mobile-fullscreen-modal').showModal();
             } else {
-                document.exitFullscreen();
+                const img = document.getElementById('camera-image');
+                if (!document.fullscreenElement) {
+                    img.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
             }
+        }
+
+        function closeMobileFullscreen() {
+            document.getElementById('mobile-fullscreen-modal').close();
         }
         
         function takeScreenshot() {
