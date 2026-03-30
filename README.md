@@ -41,6 +41,8 @@ npm run server
 - Timelapse viewer with day-wide navigation and hour jump
 - Event history with manual deletion option
 - Alert thumbnails highlight detection events in timelapse
+- Lazy loading thumbnails (100 at a time) for smooth performance with large datasets
+- Mobile-optimized time display and responsive image sizes
 
 ### Supported Animals
 

@@ -318,6 +318,16 @@ async def stream_page():
         return HTMLResponse(f.read())
 
 
+@app.get("/templates/{filename}")
+async def serve_template_file(filename: str):
+    if not filename.endswith(".js"):
+        raise HTTPException(status_code=404, detail="Not found")
+    file_path = Path(__file__).parent / "templates" / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(file_path, media_type="application/javascript")
+
+
 def generate_mjpeg():
     while True:
         frame = camera.current_frame

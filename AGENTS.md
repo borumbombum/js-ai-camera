@@ -116,8 +116,9 @@ Replace `<tailscale-ip>` with your machine's Tailscale IP:
 │   ├── events.db           # SQLite database for events
 │   ├── recordings/         # Timelapse images (YYYY-MM-DD/HH/MM_SS.jpg)
 │   └── templates/
-│       ├── stream.html     # Live Camera web UI
-│       └── timelapse.html  # Timelapse Viewer web UI
+│       ├── events.js      # Shared Event History & Logs (stream + timelapse)
+│       ├── stream.html    # Live Camera web UI
+│       └── timelapse.html # Timelapse Viewer web UI
 └── .venv/                  # Python virtual environment
 ```
 
@@ -129,8 +130,9 @@ Replace `<tailscale-ip>` with your machine's Tailscale IP:
 | `server/stream_server.py` | Camera capture, FastAPI routes, detection loop |
 | `server/telegram_bot.py` | Async Telegram bot with notification sending |
 | `server/timelapse.py` | Timelapse recording (every 2s) and hourly cleanup |
+| `server/templates/events.js` | Shared Event History and Logs functions |
 | `server/templates/stream.html` | Live Camera UI with MJPEG player + object list |
-| `server/templates/timelapse.html` | Timelapse Viewer with day navigation + alerts |
+| `server/templates/timelapse.html` | Timelapse Viewer with lazy loading + alerts |
 
 ## Timelapse System
 
@@ -144,8 +146,10 @@ Replace `<tailscale-ip>` with your machine's Tailscale IP:
 - Hour dropdown for quick navigation to specific hour
 - Alert thumbnails highlight detection events with red ring
 - Click thumbnails to navigate to specific image
-- "Show All Images" toggle for full day view
+- "Show All Images" toggle for full day view with lazy loading (100 thumbnails at a time)
 - Click main image to see detection details modal
+- Responsive time display: HH:MM on mobile, HH:MM:SS on desktop
+- Larger images on desktop (64px) vs mobile (48px)
 
 ### Detection Screenshot Delay
 - When detection triggers, waits 1 second before capturing screenshot
