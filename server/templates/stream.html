@@ -32,8 +32,13 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2">
                 <div class="card bg-base-300 shadow-xl">
-                    <figure class="bg-base-200">
-                        <img src="/video_feed" alt="Camera Feed" class="w-full">
+                    <figure class="bg-base-200 relative">
+                        <img id="camera-image" src="/video_feed" alt="Camera Feed" class="w-full">
+                        <button onclick="toggleFullscreen()" class="absolute bottom-3 right-3 btn btn-circle btn-sm btn-ghost opacity-70 hover:opacity-100 bg-black/50">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                        </button>
                     </figure>
                 </div>
             </div>
@@ -200,6 +205,15 @@
             document.getElementById('person-count').textContent = detections.filter(d => d.class.toLowerCase() === 'person').length;
             const highest = Math.max(...detections.map(d => d.confidence));
             document.getElementById('highest-confidence').textContent = highest > 0 ? `${(highest * 100).toFixed(1)}%` : '-';
+        }
+        
+        function toggleFullscreen() {
+            const img = document.getElementById('camera-image');
+            if (!document.fullscreenElement) {
+                img.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
         }
         
         function takeScreenshot() {
